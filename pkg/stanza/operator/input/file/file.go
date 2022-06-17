@@ -264,7 +264,6 @@ func (f *Input) newReader(file *os.File, fp *Fingerprint, firstCheck bool) (*Rea
 		if err != nil {
 			return nil, err
 		}
-		newReader.fileAttributes = f.resolveFileAttributes(file.Name())
 		return newReader, nil
 	}
 
