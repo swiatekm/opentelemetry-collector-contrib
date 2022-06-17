@@ -848,8 +848,13 @@ func TestFileReader_FingerprintUpdated(t *testing.T) {
 
 	splitter, err := operator.getMultiline()
 	require.NoError(t, err)
-
-	reader, err := operator.NewReader(temp.Name(), tempCopy, fp, splitter)
+	bufferPool := &sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 16384)
+			return buffer
+		},
+	}
+	reader, err := operator.NewReader(temp.Name(), tempCopy, fp, splitter, bufferPool)
 	require.NoError(t, err)
 	defer reader.Close()
 
@@ -894,8 +899,13 @@ func TestFingerprintGrowsAndStops(t *testing.T) {
 
 			splitter, err := operator.getMultiline()
 			require.NoError(t, err)
-
-			reader, err := operator.NewReader(temp.Name(), tempCopy, fp, splitter)
+			bufferPool := &sync.Pool{
+				New: func() interface{} {
+					buffer := make([]byte, 16384)
+					return buffer
+				},
+			}
+			reader, err := operator.NewReader(temp.Name(), tempCopy, fp, splitter, bufferPool)
 			require.NoError(t, err)
 			defer reader.Close()
 

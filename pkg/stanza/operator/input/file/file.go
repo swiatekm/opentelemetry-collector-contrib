@@ -56,7 +56,8 @@ type Input struct {
 
 	fingerprintSize int
 
-	encoding helper.Encoding
+	encoding   helper.Encoding
+	bufferPool *sync.Pool
 
 	wg         sync.WaitGroup
 	firstCheck bool
@@ -70,6 +71,13 @@ func (f *Input) Start(persister operator.Persister) error {
 	f.firstCheck = true
 
 	f.persister = persister
+
+	f.bufferPool = &sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 16384)
+			return buffer
+		},
+	}
 
 	// Load offsets from disk
 	if err := f.loadLastPollFiles(ctx); err != nil {
@@ -272,7 +280,7 @@ func (f *Input) newReader(file *os.File, fp *Fingerprint, firstCheck bool) (*Rea
 	if err != nil {
 		return nil, err
 	}
-	newReader, err := f.NewReader(file.Name(), file, fp, splitter)
+	newReader, err := f.NewReader(file.Name(), file, fp, splitter, f.bufferPool)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +354,7 @@ func (f *Input) loadLastPollFiles(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		newReader, err := f.NewReader("", nil, nil, splitter)
+		newReader, err := f.NewReader("", nil, nil, splitter, f.bufferPool)
 		if err != nil {
 			return err
 		}

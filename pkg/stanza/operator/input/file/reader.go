@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"go.uber.org/zap"
 	"golang.org/x/text/encoding"
@@ -72,13 +73,15 @@ type Reader struct {
 	decoder      *encoding.Decoder
 	decodeBuffer []byte
 
+	bufferPool *sync.Pool
+
 	splitter *helper.Splitter
 
 	*zap.SugaredLogger `json:"-"`
 }
 
 // NewReader creates a new file reader
-func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter *helper.Splitter) (*Reader, error) {
+func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter *helper.Splitter, bufferPool *sync.Pool) (*Reader, error) {
 	r := &Reader{
 		Fingerprint:    fp,
 		file:           file,
@@ -86,6 +89,7 @@ func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter 
 		SugaredLogger:  f.SugaredLogger.With("path", path),
 		decoder:        f.encoding.Encoding.NewDecoder(),
 		decodeBuffer:   make([]byte, 1<<12),
+		bufferPool:     bufferPool,
 		fileAttributes: f.resolveFileAttributes(path),
 		splitter:       splitter,
 	}
@@ -94,7 +98,7 @@ func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter 
 
 // Copy creates a deep copy of a Reader
 func (r *Reader) Copy(file *os.File) (*Reader, error) {
-	reader, err := r.fileInput.NewReader(r.fileAttributes.Path, file, r.Fingerprint.Copy(), r.splitter)
+	reader, err := r.fileInput.NewReader(r.fileAttributes.Path, file, r.Fingerprint.Copy(), r.splitter, r.bufferPool)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +124,8 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 		r.Errorw("Failed to seek", zap.Error(err))
 		return
 	}
-
-	scanner := NewPositionalScanner(r, r.fileInput.MaxLogSize, r.Offset, r.splitter.SplitFunc)
+	scannerBuffer := r.bufferPool.Get().([]byte)
+	scanner := NewPositionalScanner(r, r.fileInput.MaxLogSize, r.Offset, r.splitter.SplitFunc, scannerBuffer)
 
 	// Iterate over the tokenized file, emitting entries as we go
 	for {
@@ -144,6 +148,7 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 		}
 		r.Offset = scanner.Pos()
 	}
+	r.bufferPool.Put(scannerBuffer)
 }
 
 // Close will close the file

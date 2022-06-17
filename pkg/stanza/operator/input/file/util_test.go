@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,7 +61,15 @@ func newTestFileOperator(t *testing.T, cfgMod func(*Config), outMod func(*testut
 	err = op.SetOutputs([]operator.Operator{fakeOutput})
 	require.NoError(t, err)
 
-	return op.(*Input), fakeOutput.Received, tempDir
+	input := op.(*Input)
+	input.bufferPool = &sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 16384)
+			return buffer
+		},
+	}
+
+	return input, fakeOutput.Received, tempDir
 }
 
 func openFile(tb testing.TB, path string) *os.File {
