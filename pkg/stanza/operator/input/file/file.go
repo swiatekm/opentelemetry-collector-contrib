@@ -56,8 +56,9 @@ type Input struct {
 
 	fingerprintSize int
 
-	encoding   helper.Encoding
-	bufferPool *sync.Pool
+	encoding        helper.Encoding
+	serializeBuffer bytes.Buffer
+	bufferPool      *sync.Pool
 
 	wg         sync.WaitGroup
 	firstCheck bool
@@ -306,8 +307,10 @@ const knownFilesKey = "knownFiles"
 
 // syncLastPollFiles syncs the most recent set of files to the database
 func (f *Input) syncLastPollFiles(ctx context.Context) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	// var buf bytes.Buffer
+	buf := &f.serializeBuffer
+	buf.Reset()
+	enc := json.NewEncoder(buf)
 
 	// Encode the number of known files
 	if err := enc.Encode(len(f.knownFiles)); err != nil {
