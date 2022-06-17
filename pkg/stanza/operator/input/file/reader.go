@@ -88,7 +88,6 @@ func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter 
 		fileInput:      f,
 		SugaredLogger:  f.SugaredLogger.With("path", path),
 		decoder:        f.encoding.Encoding.NewDecoder(),
-		decodeBuffer:   make([]byte, 1<<12),
 		bufferPool:     bufferPool,
 		fileAttributes: f.resolveFileAttributes(path),
 		splitter:       splitter,
@@ -125,8 +124,12 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 		return
 	}
 	scannerBuffer := r.bufferPool.Get().([]byte)
+	r.decodeBuffer = r.bufferPool.Get().([]byte)
 	scanner := NewPositionalScanner(r, r.fileInput.MaxLogSize, r.Offset, r.splitter.SplitFunc, scannerBuffer)
-
+	defer func() {
+		r.bufferPool.Put(scannerBuffer)
+		r.bufferPool.Put(r.decodeBuffer)
+	}()
 	// Iterate over the tokenized file, emitting entries as we go
 	for {
 		select {
@@ -148,7 +151,6 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 		}
 		r.Offset = scanner.Pos()
 	}
-	r.bufferPool.Put(scannerBuffer)
 }
 
 // Close will close the file
