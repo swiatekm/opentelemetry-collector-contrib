@@ -15,8 +15,11 @@
 package file
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -179,18 +182,64 @@ func BenchmarkFileInput(b *testing.B) {
 			}()
 			require.NoError(b, err)
 
-			// write the remainder of lines while running
-			go func() {
-				for i := mid; i < b.N; i++ {
-					for _, file := range files {
-						file.log(i)
-					}
-				}
-			}()
-
-			for i := 0; i < b.N*len(files); i++ {
-				<-fakeOutput.Received
-			}
 		})
 	}
+}
+
+func BenchmarkPoll(b *testing.B) {
+	fileCount := 20
+	rootDir := b.TempDir()
+	var paths []string
+	var files []*benchFile
+
+	for i := 0; i < fileCount; i++ {
+		paths = append(paths, fmt.Sprintf("file%d.log", i))
+	}
+
+	for _, path := range paths {
+		file := openFile(b, filepath.Join(rootDir, path))
+		files = append(files, simpleTextFile(b, file))
+	}
+
+	cfg := NewConfig("test_id")
+	cfg.Include = []string{"file*.log"}
+	cfg.OutputIDs = []string{"fake"}
+	for i, inc := range cfg.Include {
+		cfg.Include[i] = filepath.Join(rootDir, inc)
+	}
+	cfg.StartAt = "beginning"
+
+	op, err := cfg.Build(testutil.Logger(b))
+	require.NoError(b, err)
+
+	fakeOutput := testutil.NewFakeOutput(b)
+	go func() {
+		for range fakeOutput.Received {
+		}
+	}()
+	err = op.SetOutputs([]operator.Operator{fakeOutput})
+	require.NoError(b, err)
+
+	for i := 0; i < 21; i++ {
+		for _, file := range files {
+			file.log(i)
+		}
+	}
+
+	input := op.(*Input)
+	input.persister = testutil.NewMockPersister("test")
+	input.bufferPool = &sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 16384)
+			return buffer
+		},
+	}
+	input.poll(context.Background())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ctx := context.Background()
+		input.poll(ctx)
+	}
+	require.NoError(b, err)
 }
