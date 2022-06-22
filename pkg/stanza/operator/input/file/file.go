@@ -257,13 +257,20 @@ func (f *Input) saveCurrent(readers []*Reader) {
 	// Clear out old readers. They are sorted such that they are oldest first,
 	// so we can just find the first reader whose generation is less than our
 	// max, and keep every reader after that
-	for i := 0; i < len(f.knownFiles); i++ {
-		reader := f.knownFiles[i]
+	// for i := 0; i < len(f.knownFiles); i++ {
+	// 	reader := f.knownFiles[i]
+	// 	if reader.generation <= 3 {
+	// 		f.knownFiles = f.knownFiles[i:]
+	// 		break
+	// 	}
+	// }
+	newKnownFiles := make([]*Reader, 0)
+	for _, reader := range f.knownFiles {
 		if reader.generation <= 3 {
-			f.knownFiles = f.knownFiles[i:]
-			break
+			newKnownFiles = append(newKnownFiles, reader)
 		}
 	}
+	f.knownFiles = newKnownFiles
 }
 
 func (f *Input) newReader(file *os.File, fp *Fingerprint, firstCheck bool) (*Reader, error) {

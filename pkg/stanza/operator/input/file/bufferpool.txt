@@ -1,0 +1,7 @@
+goos: darwin
+goarch: amd64
+pkg: github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/file
+cpu: Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz
+BenchmarkPoll-16    	     428	   2430199 ns/op	  740299 B/op	    1561 allocs/op
+PASS
+ok  	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/file	18.742s

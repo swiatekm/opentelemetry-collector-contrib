@@ -97,11 +97,23 @@ func (f *Input) NewReader(path string, file *os.File, fp *Fingerprint, splitter 
 
 // Copy creates a deep copy of a Reader
 func (r *Reader) Copy(file *os.File) (*Reader, error) {
-	reader, err := r.fileInput.NewReader(r.fileAttributes.Path, file, r.Fingerprint.Copy(), r.splitter, r.bufferPool)
-	if err != nil {
-		return nil, err
+	// reader, err := r.fileInput.NewReader(r.fileAttributes.Path, file, r.Fingerprint.Copy(), r.splitter, r.bufferPool)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// reader.Offset = r.Offset
+	reader := &Reader{
+		Fingerprint:    r.Fingerprint,
+		file:           file,
+		fileInput:      r.fileInput,
+		SugaredLogger:  r.SugaredLogger,
+		decoder:        r.fileInput.encoding.Encoding.NewDecoder(),
+		bufferPool:     r.bufferPool,
+		fileAttributes: r.fileAttributes,
+		splitter:       r.splitter,
+		Offset:         r.Offset,
 	}
-	reader.Offset = r.Offset
+
 	return reader, nil
 }
 
