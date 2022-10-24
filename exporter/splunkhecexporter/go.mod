@@ -9,7 +9,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/splunk v0.55.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchperresourceattr v0.55.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/opencensus v0.55.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/collector v0.55.1-0.20220711160057-6133c820fd50
 	go.opentelemetry.io/collector/pdata v0.55.1-0.20220711160057-6133c820fd50
 	go.opentelemetry.io/collector/semconv v0.55.1-0.20220711160057-6133c820fd50
