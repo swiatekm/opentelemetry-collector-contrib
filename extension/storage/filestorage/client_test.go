@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -681,4 +682,76 @@ func BenchmarkClientCompactDb(b *testing.B) {
 		require.NoError(b, client.Compact(tempDir, time.Second, 65536))
 		b.StopTimer()
 	}
+}
+
+// setup instructions:
+// $ dd if=/dev/zero of=volume.ext4 count=40960
+// $ mkfs -t ext4 -q volume.ext4 -F
+// $ sudo mount -o loop,rw volume.ext4 $(pwd)/volume/
+// $ sudo chown -f -R $(whoami) volume
+func TestFilesystemFull(t *testing.T) {
+	entrySizeInBytes := 512 * 1024
+	entry := make([]byte, entrySizeInBytes)
+	var testKey string
+
+	dbFile := filepath.Join("volume", "my_db")
+
+	client, err := newClient(zap.NewNop(), dbFile, time.Second, &CompactionConfig{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, client.Close(context.TODO()))
+		require.NoError(t, os.Remove(dbFile))
+	})
+
+	ctx := context.Background()
+
+	// fill the filesystem
+	n := 0
+	for {
+		testKey = fmt.Sprintf("testKey-%d", n)
+		err = client.Batch(ctx, storage.SetOperation(testKey, entry))
+		if err != nil {
+			require.ErrorIs(t, err, syscall.ENOSPC)
+			break
+		}
+		n++
+	}
+	anotherEntry := make([]byte, entrySizeInBytes)
+	testKey = fmt.Sprintf("testKey-%d", 0)
+	err = client.Set(ctx, testKey, anotherEntry)
+	require.NoError(t, err)
+
+	// do some delete + set transactions until we get ENOSPC again
+	var anotherKey string
+	n = 0
+	for {
+		testKey = fmt.Sprintf("testKey-%d", n)
+		anotherKey = fmt.Sprintf("anotherKey-%d", n)
+		testEntries := []storage.Operation{
+			storage.DeleteOperation(testKey),
+			storage.SetOperation(anotherKey, anotherEntry),
+		}
+		err = client.Batch(ctx, testEntries...)
+		if err != nil {
+			require.ErrorIs(t, err, syscall.ENOSPC)
+			break
+		}
+		n++
+	}
+	t.Logf("Number of replacements: %d", n)
+
+	// try to delete and set a key to a value of size 1, should fail
+	testEntries := []storage.Operation{
+		storage.DeleteOperation(testKey),
+		storage.SetOperation(anotherKey, []byte{0}),
+	}
+	err = client.Batch(ctx, testEntries...)
+	require.Error(t, err)
+	require.ErrorIs(t, err, syscall.ENOSPC)
+
+	// try to delete the key first and then set, should succeed
+	err = client.Delete(ctx, testKey)
+	require.NoError(t, err)
+	err = client.Set(ctx, anotherKey, anotherEntry)
+	require.NoError(t, err)
 }
