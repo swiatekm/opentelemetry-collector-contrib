@@ -3,7 +3,7 @@ module github.com/open-telemetry/opentelemetry-collector-contrib/receiver/docker
 go 1.17
 
 require (
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/docker v23.0.1+incompatible
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/containertest v0.55.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.55.0
 	github.com/stretchr/testify v1.8.0
@@ -40,7 +40,6 @@ require (
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel v1.8.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
