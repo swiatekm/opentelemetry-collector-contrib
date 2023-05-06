@@ -83,8 +83,8 @@ func (p *logProcessor) ConsumeLogs(ctx context.Context, l plog.Logs) error {
 }
 
 type logsGroup struct {
-	exporters []exporter.Logs
-	logs      plog.Logs
+	exporters       []exporter.Logs
+	resourceIndices []int
 }
 
 func (p *logProcessor) route(ctx context.Context, l plog.Logs) error {
@@ -93,7 +93,6 @@ func (p *logProcessor) route(ctx context.Context, l plog.Logs) error {
 	// This way we're not ending up with all the logs split up which would cause
 	// higher CPU usage.
 	groups := map[string]logsGroup{}
-	var errs error
 
 	for i := 0; i < l.ResourceLogs().Len(); i++ {
 		rlogs := l.ResourceLogs().At(i)
@@ -110,42 +109,65 @@ func (p *logProcessor) route(ctx context.Context, l plog.Logs) error {
 				if p.config.ErrorMode == ottl.PropagateError {
 					return err
 				}
-				p.group("", groups, p.router.defaultExporters, rlogs)
+				p.group("", groups, p.router.defaultExporters, i)
 				continue
 			}
 			if !isMatch {
 				matchCount--
 				continue
 			}
-			p.group(key, groups, route.exporters, rlogs)
+			p.group(key, groups, route.exporters, i)
 		}
 
 		if matchCount == 0 {
 			// no route conditions are matched, add resource logs to default exporters group
-			p.group("", groups, p.router.defaultExporters, rlogs)
+			p.group("", groups, p.router.defaultExporters, i)
 		}
 	}
-	for _, g := range groups {
-		for _, e := range g.exporters {
-			errs = multierr.Append(errs, e.ConsumeLogs(ctx, g.logs))
-		}
-	}
-	return errs
+
+	return p.consumeGroups(ctx, groups, l)
 }
 
 func (p *logProcessor) group(
 	key string,
 	groups map[string]logsGroup,
 	exporters []exporter.Logs,
-	spans plog.ResourceLogs,
+	resourceIndex int,
 ) {
 	group, ok := groups[key]
 	if !ok {
-		group.logs = plog.NewLogs()
 		group.exporters = exporters
 	}
-	spans.CopyTo(group.logs.ResourceLogs().AppendEmpty())
+	group.resourceIndices = append(group.resourceIndices, resourceIndex)
 	groups[key] = group
+}
+
+func (p *logProcessor) consumeGroups(ctx context.Context, groups map[string]logsGroup, l plog.Logs) error {
+	var errs error
+	copyCount := make([]int, l.ResourceLogs().Len())
+
+	for _, g := range groups {
+		for _, resourceIndex := range g.resourceIndices {
+			copyCount[resourceIndex] += 1
+		}
+	}
+
+	for _, g := range groups {
+		groupLogs := plog.NewLogs()
+		for _, resourceIndex := range g.resourceIndices {
+			resource := l.ResourceLogs().At(resourceIndex)
+			if copyCount[resourceIndex] > 1 {
+				resource.CopyTo(groupLogs.ResourceLogs().AppendEmpty())
+				copyCount[resourceIndex]--
+			} else {
+				resource.MoveTo(groupLogs.ResourceLogs().AppendEmpty())
+			}
+		}
+		for _, e := range g.exporters {
+			errs = multierr.Append(errs, e.ConsumeLogs(ctx, groupLogs))
+		}
+	}
+	return errs
 }
 
 func (p *logProcessor) routeForContext(ctx context.Context, l plog.Logs) error {
