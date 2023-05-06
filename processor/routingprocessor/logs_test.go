@@ -16,6 +16,7 @@ package routingprocessor
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -369,6 +370,106 @@ func TestLogsAreCorrectlySplitPerResourceAttributeWithOTTL(t *testing.T) {
 		assert.True(t, ok, "routing attribute must exists")
 		assert.Equal(t, attr.AsString(), "something-else")
 	})
+}
+
+func Benchmark_EachLogOneRoute(b *testing.B) {
+	logMessage := strings.Repeat("a", 256)
+	logCountPerGroup := 1000
+	defaultExp := &mockLogsExporter{}
+	lExp := &mockLogsExporter{}
+
+	host := newMockHost(map[component.DataType]map[component.ID]component.Component{
+		component.DataTypeLogs: {
+			component.NewID("otlp"):              defaultExp,
+			component.NewIDWithName("otlp", "2"): lExp,
+		},
+	})
+
+	exp := newLogProcessor(component.TelemetrySettings{Logger: zap.NewNop()}, &Config{
+		FromAttribute:    "X-Tenant",
+		AttributeSource:  resourceAttributeSource,
+		DefaultExporters: []string{"otlp"},
+		Table: []RoutingTableItem{
+			{
+				Value:     "acme",
+				Exporters: []string{"otlp/2"},
+			},
+		},
+	})
+
+	l := plog.NewLogs()
+
+	rl := l.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("X-Tenant", "acme")
+	logRecords := rl.ScopeLogs().AppendEmpty().LogRecords()
+	for i := 0; i < logCountPerGroup; i++ {
+		logRecords.AppendEmpty().Body().SetStr(logMessage)
+	}
+
+	rl = l.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("X-Tenant", "something-else")
+	logRecords = rl.ScopeLogs().AppendEmpty().LogRecords()
+	for i := 0; i < logCountPerGroup; i++ {
+		logRecords.AppendEmpty().Body().SetStr(logMessage)
+	}
+
+	ctx := context.Background()
+	require.NoError(b, exp.Start(ctx, host))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		require.NoError(b, exp.ConsumeLogs(ctx, l))
+	}
+}
+
+func Benchmark_EachLogAllRoutes(b *testing.B) {
+	logMessage := strings.Repeat("a", 256)
+	logCountPerGroup := 1000
+	defaultExp := &mockLogsExporter{}
+	lExp := &mockLogsExporter{}
+
+	host := newMockHost(map[component.DataType]map[component.ID]component.Component{
+		component.DataTypeLogs: {
+			component.NewID("otlp"):              defaultExp,
+			component.NewIDWithName("otlp", "2"): lExp,
+		},
+	})
+
+	exp := newLogProcessor(component.TelemetrySettings{Logger: zap.NewNop()}, &Config{
+		FromAttribute:    "X-Tenant",
+		AttributeSource:  resourceAttributeSource,
+		DefaultExporters: []string{"otlp"},
+		Table: []RoutingTableItem{
+			{
+				Statement: "route()",
+				Exporters: []string{"otlp/2"},
+			},
+		},
+	})
+
+	l := plog.NewLogs()
+
+	rl := l.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("X-Tenant", "acme")
+	logRecords := rl.ScopeLogs().AppendEmpty().LogRecords()
+	for i := 0; i < logCountPerGroup; i++ {
+		logRecords.AppendEmpty().Body().SetStr(logMessage)
+	}
+
+	rl = l.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("X-Tenant", "something-else")
+	logRecords = rl.ScopeLogs().AppendEmpty().LogRecords()
+	for i := 0; i < logCountPerGroup; i++ {
+		logRecords.AppendEmpty().Body().SetStr(logMessage)
+	}
+
+	ctx := context.Background()
+	require.NoError(b, exp.Start(ctx, host))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		require.NoError(b, exp.ConsumeLogs(ctx, l))
+	}
 }
 
 type mockLogsExporter struct {

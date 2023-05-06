@@ -1,0 +1,16 @@
+goos: linux
+goarch: amd64
+pkg: github.com/open-telemetry/opentelemetry-collector-contrib/processor/routingprocessor
+cpu: AMD Ryzen 7 2700X Eight-Core Processor         
+Benchmark_EachLogOneRoute-16    	  621866	      2027 ns/op	     498 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  600691	      1990 ns/op	     500 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  595114	      1952 ns/op	     500 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  564254	      1996 ns/op	     502 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  605702	      1969 ns/op	     499 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  562198	      1888 ns/op	     503 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  614816	      1948 ns/op	     499 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  547596	      1961 ns/op	     504 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  593815	      1953 ns/op	     500 B/op	      12 allocs/op
+Benchmark_EachLogOneRoute-16    	  613376	      2133 ns/op	     499 B/op	      12 allocs/op
+PASS
+ok  	github.com/open-telemetry/opentelemetry-collector-contrib/processor/routingprocessor	17.877s
