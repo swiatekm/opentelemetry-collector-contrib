@@ -6,6 +6,7 @@ package fileexporter // import "github.com/open-telemetry/opentelemetry-collecto
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding"
 )
 
 // Marshaler configuration used for marhsaling Protobuf
@@ -42,6 +45,7 @@ type fileExporter struct {
 	tracesMarshaler  ptrace.Marshaler
 	metricsMarshaler pmetric.Marshaler
 	logsMarshaler    plog.Marshaler
+	encoderId        *component.ID
 
 	compression string
 	compressor  compressFunc
@@ -136,9 +140,16 @@ func (e *fileExporter) startFlusher() {
 }
 
 // Start starts the flush timer if set.
-func (e *fileExporter) Start(context.Context, component.Host) error {
+func (e *fileExporter) Start(ctx context.Context, host component.Host) error {
 	if e.flushInterval > 0 {
 		e.startFlusher()
+	}
+	if e.encoderId != nil {
+		logsMarshaler, err := toLogsMarshaller(ctx, *e.encoderId, host)
+		if err != nil {
+			return err
+		}
+		e.logsMarshaler = logsMarshaler
 	}
 	return nil
 }
@@ -166,4 +177,18 @@ func buildExportFunc(cfg *Config) func(e *fileExporter, buf []byte) error {
 		return exportMessageAsBuffer
 	}
 	return exportMessageAsLine
+}
+
+func toLogsMarshaller(ctx context.Context, encoderID component.ID, host component.Host) (plog.Marshaler, error) {
+	ext, found := host.GetExtensions()[encoderID]
+	if !found {
+		return nil, fmt.Errorf("extension not found: %s", encoderID)
+	}
+
+	encodingExt, ok := ext.(encoding.LogsMarshalerExtension)
+	if !ok {
+		return nil, fmt.Errorf("extension %s is not an encoding extension", encoderID)
+	}
+
+	return encodingExt, nil
 }

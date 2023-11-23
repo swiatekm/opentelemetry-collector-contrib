@@ -4,6 +4,7 @@
 package textencodingextension // import "github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/textencodingextension"
 
 import (
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -30,6 +31,23 @@ func (r *textLogCodec) UnmarshalLogs(buf []byte) (plog.Logs, error) {
 }
 
 func (r *textLogCodec) MarshalLogs(ld plog.Logs) ([]byte, error) {
-	marshaler := &plog.JSONMarshaler{}
-	return marshaler.MarshalLogs(ld)
+	encoder := r.enc.Encoding.NewEncoder()
+	delimiter := '\n'
+	builder := strings.Builder{}
+	for i := 0; i < ld.ResourceLogs().Len(); i++ {
+		resourceLogs := ld.ResourceLogs().At(i)
+		for j := 0; j < resourceLogs.ScopeLogs().Len(); j++ {
+			scopeLogs := resourceLogs.ScopeLogs().At(j)
+			for k := 0; k < scopeLogs.LogRecords().Len(); k++ {
+				logRecord := scopeLogs.LogRecords().At(k)
+				if builder.Len() > 0 {
+					builder.WriteRune(delimiter)
+				}
+				builder.WriteString(logRecord.Body().AsString())
+			}
+		}
+	}
+	output := make([]byte, builder.Len())
+	_, _, err := encoder.Transform(output, []byte(builder.String()), false)
+	return output, err
 }

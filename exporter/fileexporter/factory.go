@@ -124,6 +124,7 @@ func newFileExporter(conf *Config, writer io.WriteCloser) *fileExporter {
 		path:             conf.Path,
 		formatType:       conf.FormatType,
 		file:             writer,
+		encoderId:  	  conf.Encoding,
 		tracesMarshaler:  tracesMarshalers[conf.FormatType],
 		metricsMarshaler: metricsMarshalers[conf.FormatType],
 		logsMarshaler:    logsMarshalers[conf.FormatType],
