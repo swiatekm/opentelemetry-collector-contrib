@@ -4,6 +4,8 @@
 package file // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/file"
 
 import (
+	"unsafe"
+
 	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/decode"
@@ -45,7 +47,7 @@ func (c Config) Build(logger *zap.SugaredLogger) (operator.Operator, error) {
 	}
 
 	var toBody toBodyFunc = func(token []byte) any {
-		return string(token)
+		return UnsafeByteToString(token)
 	}
 	if decode.IsNop(c.Config.Encoding) {
 		toBody = func(token []byte) any {
@@ -66,4 +68,10 @@ func (c Config) Build(logger *zap.SugaredLogger) (operator.Operator, error) {
 	}
 
 	return input, nil
+}
+
+// UnsafeByteToString converts a byte array to a string without copying the content.
+// The input byte array must not be modified after calling this function.
+func UnsafeByteToString(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
