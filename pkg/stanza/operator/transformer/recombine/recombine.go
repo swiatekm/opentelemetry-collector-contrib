@@ -4,9 +4,9 @@
 package recombine // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/transformer/recombine"
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,7 +118,7 @@ func (c *Config) Build(logger *zap.SugaredLogger) (operator.Operator, error) {
 			New: func() any {
 				return &sourceBatch{
 					entries:    []*entry.Entry{},
-					recombined: &bytes.Buffer{},
+					recombined: strings.Builder{},
 				}
 			},
 		},
@@ -157,7 +157,7 @@ type Transformer struct {
 // sourceBatch contains the status info of a batch
 type sourceBatch struct {
 	entries                []*entry.Entry
-	recombined             *bytes.Buffer
+	recombined             strings.Builder
 	firstEntryObservedTime time.Time
 }
 
