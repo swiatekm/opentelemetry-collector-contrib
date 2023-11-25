@@ -169,6 +169,27 @@ func TestReadNewLogs(t *testing.T) {
 	waitForMessage(t, logReceived, "testlog")
 }
 
+func BenchmarkReadNewLogs(b *testing.B) {
+	operator, logReceived, tempDir := newTestFileOperator(b, nil)
+
+	// Create a new file
+	temp := openTemp(b, tempDir)
+	for i := 0; i < b.N; i++ {
+		writeString(b, temp, "testlog\n")
+	}
+
+	b.ResetTimer()
+	require.NoError(b, operator.Start(testutil.NewUnscopedMockPersister()))
+	defer func() {
+		require.NoError(b, operator.Stop())
+	}()
+
+	// Expect the message to come through
+	for i := 0; i < b.N; i++ {
+		waitForMessage(b, logReceived, "testlog")
+	}
+}
+
 // ReadExistingAndNewLogs tests that, on startup, if start_at
 // is set to `beginning`, we read the logs that are there, and
 // we read any additional logs that are written after startup

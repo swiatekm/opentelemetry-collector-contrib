@@ -25,7 +25,7 @@ func newDefaultConfig(tempDir string) *Config {
 	return cfg
 }
 
-func newTestFileOperator(t *testing.T, cfgMod func(*Config)) (*Input, chan *entry.Entry, string) {
+func newTestFileOperator(t testing.TB, cfgMod func(*Config)) (*Input, chan *entry.Entry, string) {
 	fakeOutput := testutil.NewFakeOutput(t)
 
 	tempDir := t.TempDir()
@@ -69,7 +69,7 @@ func waitForOne(t *testing.T, c chan *entry.Entry) *entry.Entry {
 	}
 }
 
-func waitForMessage(t *testing.T, c chan *entry.Entry, expected string) {
+func waitForMessage(t testing.TB, c chan *entry.Entry, expected string) {
 	select {
 	case e := <-c:
 		require.Equal(t, expected, e.Body.(string))
