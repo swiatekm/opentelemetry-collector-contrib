@@ -51,6 +51,7 @@ type Reader struct {
 	lineSplitFunc bufio.SplitFunc
 	splitFunc     bufio.SplitFunc
 	decoder       *decode.Decoder
+	scanBuffer    []byte
 	headerReader  *header.Reader
 	processFunc   emit.Callback
 }
@@ -78,8 +79,10 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 		r.logger.Errorw("Failed to seek", zap.Error(err))
 		return
 	}
-
-	s := scanner.New(r, r.MaxLogSize, scanner.DefaultBufferSize, r.Offset, r.splitFunc)
+	if r.scanBuffer == nil {
+		r.scanBuffer = make([]byte, scanner.DefaultBufferSize)
+	}
+	s := scanner.New(r, r.MaxLogSize, scanner.DefaultBufferSize, r.Offset, r.splitFunc, r.scanBuffer)
 
 	// Iterate over the tokenized file, emitting entries as we go
 	for {
@@ -116,7 +119,7 @@ func (r *Reader) ReadToEnd(ctx context.Context) {
 					r.logger.Errorw("Failed to seek post-header", zap.Error(err))
 					return
 				}
-				s = scanner.New(r, r.MaxLogSize, scanner.DefaultBufferSize, r.Offset, r.splitFunc)
+				s = scanner.New(r, r.MaxLogSize, scanner.DefaultBufferSize, r.Offset, r.splitFunc, r.scanBuffer)
 			} else {
 				r.logger.Errorw("process: %w", zap.Error(err))
 			}
