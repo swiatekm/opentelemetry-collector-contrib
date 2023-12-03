@@ -89,6 +89,16 @@ func (p *pprofExtension) Shutdown(context.Context) error {
 	if p.file != nil {
 		pprof.StopCPUProfile()
 		_ = p.file.Close() // ignore the error
+		memProfileFileName := p.config.SaveToFile + ".mem.out"
+		f, openErr := os.Create(memProfileFileName)
+		if openErr != nil {
+			p.logger.Error("could not write memory profile", zap.Error(openErr), zap.String("file", memProfileFileName))
+		} else {
+			runtime.GC() // get up-to-date statistics
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				p.logger.Error("could not write memory profile", zap.Error(openErr), zap.String("file", memProfileFileName))
+			}
+		}
 	}
 	err := p.server.Close()
 	if p.stopCh != nil {
