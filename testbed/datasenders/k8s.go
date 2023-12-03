@@ -174,6 +174,7 @@ func NewKubernetesContainerWriter() *FileLogK8sWriter {
         id: parser-crio
         regex: '^(?P<time>[^ Z]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) (?P<log>.*)$'
         output: extract_metadata_from_filepath
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout_type: gotime
@@ -183,6 +184,7 @@ func NewKubernetesContainerWriter() *FileLogK8sWriter {
         id: parser-containerd
         regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) (?P<log>.*)$'
         output: extract_metadata_from_filepath
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout: '%%Y-%%m-%%dT%%H:%%M:%%S.%%LZ'
@@ -190,6 +192,7 @@ func NewKubernetesContainerWriter() *FileLogK8sWriter {
       - type: json_parser
         id: parser-docker
         output: extract_metadata_from_filepath
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout: '%%Y-%%m-%%dT%%H:%%M:%%S.%%LZ'
@@ -238,6 +241,7 @@ func NewKubernetesCRIContainerdWriter() *FileLogK8sWriter {
         id: parser-containerd
         regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) (?P<log>.*)$'
         output: extract_metadata_from_filepath
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout: '%%Y-%%m-%%dT%%H:%%M:%%S.%%LZ'
@@ -286,6 +290,7 @@ func NewKubernetesCRIContainerdNoAttributesOpsWriter() *FileLogK8sWriter {
         id: parser-containerd
         regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) (?P<log>.*)$'
         output: extract_metadata_from_filepath
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout: '%%Y-%%m-%%dT%%H:%%M:%%S.%%LZ'
@@ -311,6 +316,7 @@ func NewCRIContainerdWriter() *FileLogK8sWriter {
       - type: regex_parser
         id: parser-containerd
         regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) (?P<log>.*)$'
+        parse_to: body
         timestamp:
           parse_from: body.time
           layout: '%%Y-%%m-%%dT%%H:%%M:%%S.%%LZ'
