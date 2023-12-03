@@ -251,15 +251,16 @@ func toJSONDot(prefix string, keys []string) string {
 
 // getNestedMap will get a nested map assigned to a key.
 // If the map does not exist, it will create and return it.
-func getNestedMap(currentMap map[string]any, key string) map[string]any {
+func getNestedMap(currentMap map[string]any, key string, capacity int) map[string]any {
 	currentValue, ok := currentMap[key]
 	if !ok {
-		currentMap[key] = map[string]any{}
+		currentValue = make(map[string]any, capacity)
+		currentMap[key] = currentValue
 	}
 
 	nextMap, ok := currentValue.(map[string]any)
 	if !ok {
-		nextMap = map[string]any{}
+		nextMap = make(map[string]any, capacity)
 		currentMap[key] = nextMap
 	}
 

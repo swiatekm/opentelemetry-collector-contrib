@@ -105,7 +105,7 @@ func (f ResourceField) Set(entry *Entry, value any) error {
 			currentMap[key] = value
 			break
 		}
-		currentMap = getNestedMap(currentMap, key)
+		currentMap = getNestedMap(currentMap, key, 1)
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func (f ResourceField) Merge(entry *Entry, mapValues map[string]any) {
 	currentMap := entry.Resource
 
 	for _, key := range f.Keys {
-		currentMap = getNestedMap(currentMap, key)
+		currentMap = getNestedMap(currentMap, key, 1)
 	}
 
 	for key, value := range mapValues {

@@ -97,7 +97,7 @@ func (f BodyField) Set(entry *Entry, value any) error {
 			currentMap[key] = value
 			break
 		}
-		currentMap = getNestedMap(currentMap, key)
+		currentMap = getNestedMap(currentMap, key, 1)
 	}
 	return nil
 }
@@ -112,7 +112,7 @@ func (f BodyField) Merge(entry *Entry, mapValues map[string]any) {
 	}
 
 	for _, key := range f.Keys {
-		currentMap = getNestedMap(currentMap, key)
+		currentMap = getNestedMap(currentMap, key, 1)
 	}
 
 	for key, value := range mapValues {

@@ -86,7 +86,7 @@ func (f AttributeField) Get(entry *Entry) (any, bool) {
 // If a key already exists, it will be overwritten.
 func (f AttributeField) Set(entry *Entry, value any) error {
 	if entry.Attributes == nil {
-		entry.Attributes = map[string]any{}
+		entry.Attributes = make(map[string]any, 1)
 	}
 
 	mapValue, isMapValue := value.(map[string]any)
@@ -105,7 +105,7 @@ func (f AttributeField) Set(entry *Entry, value any) error {
 			currentMap[key] = value
 			break
 		}
-		currentMap = getNestedMap(currentMap, key)
+		currentMap = getNestedMap(currentMap, key, 1)
 	}
 	return nil
 }
@@ -114,9 +114,15 @@ func (f AttributeField) Set(entry *Entry, value any) error {
 // It will overwrite any intermediate values as necessary.
 func (f AttributeField) Merge(entry *Entry, mapValues map[string]any) {
 	currentMap := entry.Attributes
+	var capacity int
 
-	for _, key := range f.Keys {
-		currentMap = getNestedMap(currentMap, key)
+	for i, key := range f.Keys {
+		if i == len(f.Keys)-1 {
+			capacity = len(mapValues)
+		} else {
+			capacity = 1
+		}
+		currentMap = getNestedMap(currentMap, key, capacity)
 	}
 
 	for key, value := range mapValues {
