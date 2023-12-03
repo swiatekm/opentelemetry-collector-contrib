@@ -118,19 +118,21 @@ func (r *Parser) match(value string) (any, error) {
 		}
 	}
 
-	matches := r.regexp.FindStringSubmatch(value)
-	if matches == nil {
+	matchIndices := r.regexp.FindStringSubmatchIndex(value)
+	if matchIndices == nil {
 		return nil, fmt.Errorf("regex pattern does not match")
 	}
 
-	parsedValues := map[string]any{}
+	parsedValues := make(map[string]any, len(r.regexp.SubexpNames())-1)
 	for i, subexp := range r.regexp.SubexpNames() {
 		if i == 0 {
 			// Skip whole match
 			continue
 		}
 		if subexp != "" {
-			parsedValues[subexp] = matches[i]
+			subexpIndices := matchIndices[i*2 : i*2+2]
+			startIndex, endIndex := subexpIndices[0], subexpIndices[1]
+			parsedValues[subexp] = value[startIndex:endIndex]
 		}
 	}
 
