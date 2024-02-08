@@ -83,51 +83,27 @@ func (r *receiver) emitterLoop(ctx context.Context) {
 	defer r.wg.Done()
 
 	// Don't create done channel on every iteration.
-	doneChan := ctx.Done()
-	for {
-		select {
-		case <-doneChan:
-			r.logger.Debug("Receive loop stopped")
-			return
-
-		case e, ok := <-r.emitter.logChan:
-			if !ok {
-				continue
-			}
-
-			if err := r.converter.Batch(e); err != nil {
-				r.logger.Error("Could not add entry to batch", zap.Error(err))
-			}
+	for e := range r.emitter.logChan {
+		if err := r.converter.Batch(e); err != nil {
+			r.logger.Error("Could not add entry to batch", zap.Error(err))
 		}
 	}
+	r.converter.Stop()
 }
 
 // consumerLoop reads converter log entries and calls the consumer to consumer them.
 func (r *receiver) consumerLoop(ctx context.Context) {
 	defer r.wg.Done()
 
-	// Don't create done channel on every iteration.
-	doneChan := ctx.Done()
 	pLogsChan := r.converter.OutChannel()
-	for {
-		select {
-		case <-doneChan:
-			r.logger.Debug("Consumer loop stopped")
-			return
-
-		case pLogs, ok := <-pLogsChan:
-			if !ok {
-				r.logger.Debug("Converter channel got closed")
-				continue
-			}
-			obsrecvCtx := r.obsrecv.StartLogsOp(ctx)
-			logRecordCount := pLogs.LogRecordCount()
-			cErr := r.consumer.ConsumeLogs(ctx, pLogs)
-			if cErr != nil {
-				r.logger.Error("ConsumeLogs() failed", zap.Error(cErr))
-			}
-			r.obsrecv.EndLogsOp(obsrecvCtx, "stanza", logRecordCount, cErr)
+	for pLogs := range pLogsChan {
+		obsrecvCtx := r.obsrecv.StartLogsOp(ctx)
+		logRecordCount := pLogs.LogRecordCount()
+		cErr := r.consumer.ConsumeLogs(ctx, pLogs)
+		if cErr != nil {
+			r.logger.Error("ConsumeLogs() failed", zap.Error(cErr))
 		}
+		r.obsrecv.EndLogsOp(obsrecvCtx, "stanza", logRecordCount, cErr)
 	}
 }
 
@@ -139,8 +115,7 @@ func (r *receiver) Shutdown(ctx context.Context) error {
 
 	r.logger.Info("Stopping stanza receiver")
 	pipelineErr := r.pipe.Stop()
-	r.converter.Stop()
-	r.cancel()
+	// r.cancel()
 	r.wg.Wait()
 
 	if r.storageClient != nil {
