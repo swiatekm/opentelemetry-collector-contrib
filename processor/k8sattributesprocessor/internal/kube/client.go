@@ -5,6 +5,7 @@ package kube // import "github.com/open-telemetry/opentelemetry-collector-contri
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -39,18 +40,22 @@ var enableRFC3339Timestamp = featuregate.GlobalRegistry().MustRegister(
 
 // WatchClient is the main interface provided by this package to a kubernetes cluster.
 type WatchClient struct {
-	m                  sync.RWMutex
-	deleteMut          sync.Mutex
-	logger             *zap.Logger
-	kc                 kubernetes.Interface
-	informer           cache.SharedInformer
-	namespaceInformer  cache.SharedInformer
-	nodeInformer       cache.SharedInformer
-	replicasetInformer cache.SharedInformer
-	replicasetRegex    *regexp.Regexp
-	cronJobRegex       *regexp.Regexp
-	deleteQueue        []deleteRequest
-	stopCh             chan struct{}
+	m                             sync.RWMutex
+	deleteMut                     sync.Mutex
+	logger                        *zap.Logger
+	kc                            kubernetes.Interface
+	informer                      cache.SharedInformer
+	podHandlerRegistration        cache.ResourceEventHandlerRegistration
+	namespaceInformer             cache.SharedInformer
+	namespaceHandlerRegistration  cache.ResourceEventHandlerRegistration
+	nodeInformer                  cache.SharedInformer
+	nodeHandlerRegistration       cache.ResourceEventHandlerRegistration
+	replicasetInformer            cache.SharedInformer
+	replicasetHandlerRegistration cache.ResourceEventHandlerRegistration
+	replicasetRegex               *regexp.Regexp
+	cronJobRegex                  *regexp.Regexp
+	deleteQueue                   []deleteRequest
+	stopCh                        chan struct{}
 
 	// A map containing Pod related data, used to associate them with resources.
 	// Key can be either an IP address or Pod UID
@@ -144,7 +149,7 @@ func New(set component.TelemetrySettings, apiCfg k8sconfig.APIConfig, rules Extr
 		}
 	}
 
-	c.informer = newInformer(c.kc, c.Filters.Namespace, labelSelector, fieldSelector)
+	c.informer = newInformer(c.kc, c.Filters.Namespace, labelSelector, fieldSelector, c.stopCh)
 	err = c.informer.SetTransform(
 		func(object any) (any, error) {
 			originalPod, success := object.(*api_v1.Pod)
@@ -159,13 +164,13 @@ func New(set component.TelemetrySettings, apiCfg k8sconfig.APIConfig, rules Extr
 		return nil, err
 	}
 
-	c.namespaceInformer = newNamespaceInformer(c.kc)
+	c.namespaceInformer = newNamespaceInformer(c.kc, c.stopCh)
 
 	if rules.DeploymentName || rules.DeploymentUID {
 		if newReplicaSetInformer == nil {
 			newReplicaSetInformer = newReplicaSetSharedInformer
 		}
-		c.replicasetInformer = newReplicaSetInformer(c.kc, c.Filters.Namespace)
+		c.replicasetInformer = newReplicaSetInformer(c.kc, c.Filters.Namespace, c.stopCh)
 		err = c.replicasetInformer.SetTransform(
 			func(object any) (any, error) {
 				originalReplicaset, success := object.(*apps_v1.ReplicaSet)
@@ -190,7 +195,8 @@ func New(set component.TelemetrySettings, apiCfg k8sconfig.APIConfig, rules Extr
 
 // Start registers pod event handlers and starts watching the kubernetes cluster for pod changes.
 func (c *WatchClient) Start() {
-	_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	var err error
+	c.podHandlerRegistration, err = c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.handlePodAdd,
 		UpdateFunc: c.handlePodUpdate,
 		DeleteFunc: c.handlePodDelete,
@@ -198,9 +204,8 @@ func (c *WatchClient) Start() {
 	if err != nil {
 		c.logger.Error("error adding event handler to pod informer", zap.Error(err))
 	}
-	go c.informer.Run(c.stopCh)
 
-	_, err = c.namespaceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	c.namespaceHandlerRegistration, err = c.namespaceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.handleNamespaceAdd,
 		UpdateFunc: c.handleNamespaceUpdate,
 		DeleteFunc: c.handleNamespaceDelete,
@@ -208,10 +213,9 @@ func (c *WatchClient) Start() {
 	if err != nil {
 		c.logger.Error("error adding event handler to namespace informer", zap.Error(err))
 	}
-	go c.namespaceInformer.Run(c.stopCh)
 
 	if c.Rules.DeploymentName || c.Rules.DeploymentUID {
-		_, err = c.replicasetInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		c.replicasetHandlerRegistration, err = c.replicasetInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.handleReplicaSetAdd,
 			UpdateFunc: c.handleReplicaSetUpdate,
 			DeleteFunc: c.handleReplicaSetDelete,
@@ -219,11 +223,10 @@ func (c *WatchClient) Start() {
 		if err != nil {
 			c.logger.Error("error adding event handler to replicaset informer", zap.Error(err))
 		}
-		go c.replicasetInformer.Run(c.stopCh)
 	}
 
 	if c.nodeInformer != nil {
-		_, err = c.nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		c.nodeHandlerRegistration, err = c.nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.handleNodeAdd,
 			UpdateFunc: c.handleNodeUpdate,
 			DeleteFunc: c.handleNodeDelete,
@@ -231,12 +234,37 @@ func (c *WatchClient) Start() {
 		if err != nil {
 			c.logger.Error("error adding event handler to node informer", zap.Error(err))
 		}
-		go c.nodeInformer.Run(c.stopCh)
 	}
 }
 
 // Stop signals the the k8s watcher/informer to stop watching for new events.
 func (c *WatchClient) Stop() {
+	var eventHandlerRemovalerrors []error
+	err := c.informer.RemoveEventHandler(c.podHandlerRegistration)
+	if err != nil {
+		eventHandlerRemovalerrors = append(eventHandlerRemovalerrors, err)
+	}
+	err = c.namespaceInformer.RemoveEventHandler(c.namespaceHandlerRegistration)
+	if err != nil {
+		eventHandlerRemovalerrors = append(eventHandlerRemovalerrors, err)
+	}
+	if c.Rules.DeploymentName || c.Rules.DeploymentUID {
+		err = c.replicasetInformer.RemoveEventHandler(c.replicasetHandlerRegistration)
+		if err != nil {
+			eventHandlerRemovalerrors = append(eventHandlerRemovalerrors, err)
+		}
+	}
+	if c.nodeInformer != nil {
+		err = c.nodeInformer.RemoveEventHandler(c.nodeHandlerRegistration)
+		if err != nil {
+			eventHandlerRemovalerrors = append(eventHandlerRemovalerrors, err)
+		}
+	}
+	if len(eventHandlerRemovalerrors) > 0 {
+		multiErr := errors.Join(eventHandlerRemovalerrors...)
+		c.logger.Error("error removing event handlers from informers", zap.Error(multiErr))
+	}
+
 	close(c.stopCh)
 }
 

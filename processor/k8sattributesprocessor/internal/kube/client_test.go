@@ -186,8 +186,10 @@ func TestClientStartStop(t *testing.T) {
 	}()
 	c.Stop()
 	<-done
-	time.Sleep(time.Second)
-	assert.True(t, fctr.HasStopped())
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.True(collect, fctr.HasStopped())
+	}, time.Second, time.Millisecond)
+
 }
 
 func TestConstructorErrors(t *testing.T) {
