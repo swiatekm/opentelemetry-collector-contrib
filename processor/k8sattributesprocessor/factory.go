@@ -5,11 +5,14 @@ package k8sattributesprocessor // import "github.com/open-telemetry/opentelemetr
 
 import (
 	"context"
+	"sync"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/processor/processorhelper"
+
+	"k8s.io/client-go/informers"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
@@ -20,14 +23,24 @@ var kubeClientProvider = kube.ClientProvider(nil)
 var consumerCapabilities = consumer.Capabilities{MutatesData: true}
 var defaultExcludes = ExcludeConfig{Pods: []ExcludePodConfig{{Name: "jaeger-agent"}, {Name: "jaeger-collector"}}}
 
+type factory struct {
+	sync.Mutex
+	factories      map[string]informers.SharedInformerFactory
+	processorCount map[string]int
+}
+
 // NewFactory returns a new factory for the k8s processor.
 func NewFactory() processor.Factory {
+	f := &factory{
+		factories:      make(map[string]informers.SharedInformerFactory),
+		processorCount: make(map[string]int),
+	}
 	return processor.NewFactory(
 		metadata.Type,
 		createDefaultConfig,
-		processor.WithTraces(createTracesProcessor, metadata.TracesStability),
-		processor.WithMetrics(createMetricsProcessor, metadata.MetricsStability),
-		processor.WithLogs(createLogsProcessor, metadata.LogsStability),
+		processor.WithTraces(f.createTracesProcessor, metadata.TracesStability),
+		processor.WithMetrics(f.createMetricsProcessor, metadata.MetricsStability),
+		processor.WithLogs(f.createLogsProcessor, metadata.LogsStability),
 	)
 }
 
@@ -41,41 +54,41 @@ func createDefaultConfig() component.Config {
 	}
 }
 
-func createTracesProcessor(
+func (f *factory) createTracesProcessor(
 	ctx context.Context,
 	params processor.Settings,
 	cfg component.Config,
 	next consumer.Traces,
 ) (processor.Traces, error) {
-	return createTracesProcessorWithOptions(ctx, params, cfg, next)
+	return f.createTracesProcessorWithOptions(ctx, params, cfg, next)
 }
 
-func createLogsProcessor(
+func (f *factory) createLogsProcessor(
 	ctx context.Context,
 	params processor.Settings,
 	cfg component.Config,
 	nextLogsConsumer consumer.Logs,
 ) (processor.Logs, error) {
-	return createLogsProcessorWithOptions(ctx, params, cfg, nextLogsConsumer)
+	return f.createLogsProcessorWithOptions(ctx, params, cfg, nextLogsConsumer)
 }
 
-func createMetricsProcessor(
+func (f *factory) createMetricsProcessor(
 	ctx context.Context,
 	params processor.Settings,
 	cfg component.Config,
 	nextMetricsConsumer consumer.Metrics,
 ) (processor.Metrics, error) {
-	return createMetricsProcessorWithOptions(ctx, params, cfg, nextMetricsConsumer)
+	return f.createMetricsProcessorWithOptions(ctx, params, cfg, nextMetricsConsumer)
 }
 
-func createTracesProcessorWithOptions(
+func (f *factory) createTracesProcessorWithOptions(
 	ctx context.Context,
 	set processor.Settings,
 	cfg component.Config,
 	next consumer.Traces,
 	options ...option,
 ) (processor.Traces, error) {
-	kp := createKubernetesProcessor(set, cfg, options...)
+	kp := f.createKubernetesProcessor(set, cfg, options...)
 
 	return processorhelper.NewTraces(
 		ctx,
@@ -88,14 +101,14 @@ func createTracesProcessorWithOptions(
 		processorhelper.WithShutdown(kp.Shutdown))
 }
 
-func createMetricsProcessorWithOptions(
+func (f *factory) createMetricsProcessorWithOptions(
 	ctx context.Context,
 	set processor.Settings,
 	cfg component.Config,
 	nextMetricsConsumer consumer.Metrics,
 	options ...option,
 ) (processor.Metrics, error) {
-	kp := createKubernetesProcessor(set, cfg, options...)
+	kp := f.createKubernetesProcessor(set, cfg, options...)
 
 	return processorhelper.NewMetrics(
 		ctx,
@@ -108,14 +121,14 @@ func createMetricsProcessorWithOptions(
 		processorhelper.WithShutdown(kp.Shutdown))
 }
 
-func createLogsProcessorWithOptions(
+func (f *factory) createLogsProcessorWithOptions(
 	ctx context.Context,
 	set processor.Settings,
 	cfg component.Config,
 	nextLogsConsumer consumer.Logs,
 	options ...option,
 ) (processor.Logs, error) {
-	kp := createKubernetesProcessor(set, cfg, options...)
+	kp := f.createKubernetesProcessor(set, cfg, options...)
 
 	return processorhelper.NewLogs(
 		ctx,
@@ -128,7 +141,7 @@ func createLogsProcessorWithOptions(
 		processorhelper.WithShutdown(kp.Shutdown))
 }
 
-func createKubernetesProcessor(
+func (f *factory) createKubernetesProcessor(
 	params processor.Settings,
 	cfg component.Config,
 	options ...option,
