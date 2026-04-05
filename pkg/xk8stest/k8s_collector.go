@@ -232,3 +232,30 @@ func fetchContainerLogs(ctx context.Context, coreClient corev1client.CoreV1Inter
 	}
 	return strings.TrimRight(string(logs), "\n")
 }
+
+// FetchPodLogs returns the full log output for the first running pod matching
+// the given labels in the specified namespace. It is intended for e2e test
+// assertions that inspect collector behavior via its log output.
+func FetchPodLogs(t *testing.T, client *K8sClient, namespace string, podLabels map[string]any) string {
+	t.Helper()
+	coreClient, err := corev1client.NewForConfig(client.restConfig)
+	require.NoError(t, err, "failed to create core client for pod logs")
+
+	podGVR := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	listOptions := metav1.ListOptions{LabelSelector: SelectorFromMap(podLabels).String()}
+	list, err := client.DynamicClient.Resource(podGVR).Namespace(namespace).List(t.Context(), listOptions)
+	require.NoError(t, err, "failed to list pods")
+	require.NotEmpty(t, list.Items, "no pods found matching labels")
+
+	podName := list.Items[0].GetName()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	stream, err := coreClient.Pods(namespace).GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
+	require.NoError(t, err, "failed to stream pod logs")
+	defer stream.Close()
+
+	logs, err := io.ReadAll(stream)
+	require.NoError(t, err, "failed to read pod logs")
+	return string(logs)
+}
