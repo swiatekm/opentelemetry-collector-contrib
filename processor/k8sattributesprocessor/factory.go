@@ -59,6 +59,9 @@ func createTracesProcessor(
 	cfg component.Config,
 	next consumer.Traces,
 ) (processor.Traces, error) {
+	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+		return createTracesProcessorWithOptions(ctx, params, cfg, next)
+	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
 		return createKubernetesProcessor(params, cfg)
 	})
@@ -81,6 +84,9 @@ func createLogsProcessor(
 	cfg component.Config,
 	nextLogsConsumer consumer.Logs,
 ) (processor.Logs, error) {
+	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+		return createLogsProcessorWithOptions(ctx, params, cfg, nextLogsConsumer)
+	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
 		return createKubernetesProcessor(params, cfg)
 	})
@@ -103,6 +109,9 @@ func createMetricsProcessor(
 	cfg component.Config,
 	nextMetricsConsumer consumer.Metrics,
 ) (processor.Metrics, error) {
+	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+		return createMetricsProcessorWithOptions(ctx, params, cfg, nextMetricsConsumer)
+	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
 		return createKubernetesProcessor(params, cfg)
 	})
@@ -125,6 +134,9 @@ func createProfilesProcessor(
 	cfg component.Config,
 	nextProfilesConsumer xconsumer.Profiles,
 ) (xprocessor.Profiles, error) {
+	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+		return createProfilesProcessorWithOptions(ctx, params, cfg, nextProfilesConsumer)
+	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
 		return createKubernetesProcessor(params, cfg)
 	})
