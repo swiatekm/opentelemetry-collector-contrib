@@ -21,7 +21,7 @@ spec:
           command:
             - /otelcontribcol
             - --config=/conf/relay.yaml
-            - --feature-gates=processor.k8sattributes.enableShareProcessorAcrossSignalTypes
+            - --feature-gates=processor.k8sattributes.ShareProcessorBetweenPipelines
           image: "otelcontribcol:latest"
           imagePullPolicy: Never
           ports:

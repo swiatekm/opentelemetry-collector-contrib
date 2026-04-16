@@ -31,8 +31,8 @@ var ProcessorK8sattributesEmitV1K8sConventionsFeatureGate = featuregate.GlobalRe
 	featuregate.WithRegisterFromVersion("v0.145.0"),
 )
 
-var ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate = featuregate.GlobalRegistry().MustRegister(
-	"processor.k8sattributes.enableShareProcessorAcrossSignalTypes",
+var ProcessorK8sattributesShareProcessorBetweenPipelinesFeatureGate = featuregate.GlobalRegistry().MustRegister(
+	"processor.k8sattributes.ShareProcessorBetweenPipelines",
 	featuregate.StageAlpha,
 	featuregate.WithRegisterDescription("When enabled, processor instances with identical configuration are shared across different signal type pipelines, reducing duplicate Kubernetes API watchers."),
 	featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/2450"),

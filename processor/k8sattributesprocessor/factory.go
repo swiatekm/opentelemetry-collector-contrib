@@ -59,7 +59,7 @@ func createTracesProcessor(
 	cfg component.Config,
 	next consumer.Traces,
 ) (processor.Traces, error) {
-	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+	if !metadata.ProcessorK8sattributesShareProcessorBetweenPipelinesFeatureGate.IsEnabled() {
 		return createTracesProcessorWithOptions(ctx, params, cfg, next)
 	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
@@ -84,7 +84,7 @@ func createLogsProcessor(
 	cfg component.Config,
 	nextLogsConsumer consumer.Logs,
 ) (processor.Logs, error) {
-	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+	if !metadata.ProcessorK8sattributesShareProcessorBetweenPipelinesFeatureGate.IsEnabled() {
 		return createLogsProcessorWithOptions(ctx, params, cfg, nextLogsConsumer)
 	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
@@ -109,7 +109,7 @@ func createMetricsProcessor(
 	cfg component.Config,
 	nextMetricsConsumer consumer.Metrics,
 ) (processor.Metrics, error) {
-	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+	if !metadata.ProcessorK8sattributesShareProcessorBetweenPipelinesFeatureGate.IsEnabled() {
 		return createMetricsProcessorWithOptions(ctx, params, cfg, nextMetricsConsumer)
 	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
@@ -134,7 +134,7 @@ func createProfilesProcessor(
 	cfg component.Config,
 	nextProfilesConsumer xconsumer.Profiles,
 ) (xprocessor.Profiles, error) {
-	if !metadata.ProcessorK8sattributesEnableShareProcessorAcrossSignalTypesFeatureGate.IsEnabled() {
+	if !metadata.ProcessorK8sattributesShareProcessorBetweenPipelinesFeatureGate.IsEnabled() {
 		return createProfilesProcessorWithOptions(ctx, params, cfg, nextProfilesConsumer)
 	}
 	sc := processors.GetOrAdd(cfg, func() component.Component {
