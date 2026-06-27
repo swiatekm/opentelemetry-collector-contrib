@@ -4,7 +4,6 @@
 package mezmoexporter
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
@@ -25,25 +24,12 @@ func TestType(t *testing.T) {
 	assert.Equal(t, pType, metadata.Type)
 }
 
-var (
-	defaultMaxIdleConns        = http.DefaultTransport.(*http.Transport).MaxIdleConns
-	defaultMaxIdleConnsPerHost = http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost
-	defaultMaxConnsPerHost     = http.DefaultTransport.(*http.Transport).MaxConnsPerHost
-	defaultIdleConnTimeout     = http.DefaultTransport.(*http.Transport).IdleConnTimeout
-)
-
 func TestCreateDefaultConfig(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 
 	clientConfig := confighttp.NewDefaultClientConfig()
-	// TODO: See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/49316.
 	clientConfig.Timeout = 5 * time.Second
-	clientConfig.MaxIdleConns = defaultMaxIdleConns
-	clientConfig.MaxIdleConnsPerHost = defaultMaxIdleConnsPerHost
-	clientConfig.MaxConnsPerHost = defaultMaxConnsPerHost
-	clientConfig.IdleConnTimeout = defaultIdleConnTimeout
-	clientConfig.ForceAttemptHTTP2 = true
 
 	assert.Equal(t, &Config{
 		IngestURL: defaultIngestURL,

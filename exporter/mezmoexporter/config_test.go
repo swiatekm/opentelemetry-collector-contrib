@@ -33,13 +33,7 @@ func TestLoadConfig(t *testing.T) {
 	defaultCfg.IngestKey = "00000000000000000000000000000000"
 
 	clientConfig := confighttp.NewDefaultClientConfig()
-	// TODO: See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/49316.
 	clientConfig.Timeout = 5 * time.Second
-	clientConfig.MaxIdleConns = defaultMaxIdleConns
-	clientConfig.MaxIdleConnsPerHost = defaultMaxIdleConnsPerHost
-	clientConfig.MaxConnsPerHost = defaultMaxConnsPerHost
-	clientConfig.IdleConnTimeout = defaultIdleConnTimeout
-	clientConfig.ForceAttemptHTTP2 = true
 
 	tests := []struct {
 		id       component.ID
